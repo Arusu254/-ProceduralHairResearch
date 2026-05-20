@@ -20,20 +20,21 @@ public class HairGeneratorWindow : EditorWindow
     private Vector3[] cachedRootPoints;
     private Vector3[] cachedRootNormals;
     private Vector3[] cachedRootDirections;
-    private Vector3[] rootModifiers;   // x=长度乘数, y=卷曲乘数, z=粗细乘数
+    private Vector3[] rootModifiers;
     private bool[] rootActive;
     private bool hasGeneratedOnce = false;
 
-    // 选区相关
     private bool selectMode = false;
     private float brushRadius = 0.15f;
     private bool[] selectedRoots;
     private bool showSelectedPoints = true;
 
-    // 局部参数调节滑块
     private float localLengthMult = 1f;
     private float localCurlMult = 1f;
     private float localThickMult = 1f;
+
+    private Vector3 localDirection = Vector3.up;
+    private float localDirX = 0f, localDirY = 1f, localDirZ = 0f;
 
     [MenuItem("Tools/程序化毛发生成器")]
     public static void ShowWindow()
@@ -91,13 +92,13 @@ public class HairGeneratorWindow : EditorWindow
         length = EditorGUILayout.Slider("长度", length, 0.2f, 2.5f);
         curl = EditorGUILayout.Slider("卷曲度", curl, 0f, 2f);
         thickness = EditorGUILayout.Slider("粗细", thickness, 0.005f, 0.03f);
-        yThreshold = EditorGUILayout.Slider("发根Y值阈值（头顶区域比例）", yThreshold, 0.1f, 0.9f);
+        yThreshold = EditorGUILayout.Slider("发根Y值阈值", yThreshold, 0.1f, 0.9f);
 
         bool paramsChanged = (hairCount != oldCount || length != oldLength || curl != oldCurl || thickness != oldThick || yThreshold != oldYThres);
 
         GUILayout.Space(10);
         GUILayout.Label("选区编辑", EditorStyles.boldLabel);
-        selectMode = GUILayout.Toggle(selectMode, "进入选区模式（点击头模选中发根）", "Button");
+        selectMode = GUILayout.Toggle(selectMode, "进入选区模式", "Button");
         if (selectMode)
         {
             brushRadius = EditorGUILayout.Slider("选区半径", brushRadius, 0.05f, 0.5f);
@@ -128,7 +129,7 @@ public class HairGeneratorWindow : EditorWindow
             }
 
             GUILayout.Space(5);
-            GUILayout.Label("局部参数调节（应用于选中的发根）", EditorStyles.boldLabel);
+            GUILayout.Label("局部参数调节", EditorStyles.boldLabel);
             localLengthMult = EditorGUILayout.Slider("局部长度乘数", localLengthMult, 0.2f, 2.5f);
             localCurlMult = EditorGUILayout.Slider("局部卷曲乘数", localCurlMult, 0f, 2f);
             localThickMult = EditorGUILayout.Slider("局部粗细乘数", localThickMult, 0.5f, 2f);
@@ -137,12 +138,36 @@ public class HairGeneratorWindow : EditorWindow
                 if (selectedRoots != null && rootModifiers != null)
                 {
                     for (int i = 0; i < selectedRoots.Length; i++)
-                    {
                         if (selectedRoots[i])
-                        {
                             rootModifiers[i] = new Vector3(localLengthMult, localCurlMult, localThickMult);
-                        }
-                    }
+                    GenerateHair(false);
+                }
+            }
+
+            GUILayout.Space(5);
+            GUILayout.Label("局部方向控制", EditorStyles.boldLabel);
+            localDirX = EditorGUILayout.Slider("X方向", localDirX, -1f, 1f);
+            localDirY = EditorGUILayout.Slider("Y方向", localDirY, -1f, 1f);
+            localDirZ = EditorGUILayout.Slider("Z方向", localDirZ, -1f, 1f);
+            if (GUILayout.Button("将方向应用到选中的发根"))
+            {
+                Vector3 newDir = new Vector3(localDirX, localDirY, localDirZ).normalized;
+                if (selectedRoots != null && cachedRootDirections != null)
+                {
+                    for (int i = 0; i < selectedRoots.Length; i++)
+                        if (selectedRoots[i])
+                            cachedRootDirections[i] = newDir;
+                    GenerateHair(false);
+                }
+            }
+            if (GUILayout.Button("重置选中发根方向为随机"))
+            {
+                if (selectedRoots != null && cachedRootDirections != null)
+                {
+                    float randomStrength = 0.6f;
+                    for (int i = 0; i < selectedRoots.Length; i++)
+                        if (selectedRoots[i])
+                            cachedRootDirections[i] = (Vector3.up + Random.onUnitSphere * randomStrength).normalized;
                     GenerateHair(false);
                 }
             }
